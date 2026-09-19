@@ -1,0 +1,38 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "mcp-live-site",
+  "main": "src/index.ts",
+  "compatibility_date": "2025-09-01",
+
+  // The static frontend. Cloudflare serves these files straight from the edge;
+  // only requests that do NOT match a file (/mcp, /ws, /api/*) reach the Worker.
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS"
+  },
+
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "SITE_ROOM",
+        "class_name": "SiteRoom"
+      }
+    ]
+  },
+
+  // SQLite-backed Durable Objects are required on the Workers free plan.
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["SiteRoom"]
+    }
+  ],
+
+  "observability": {
+    "enabled": true
+  }
+
+  // Auth token for the /mcp endpoint is a secret, not a var:
+  //   npx wrangler secret put MCP_TOKEN
+  // For local dev, put MCP_TOKEN=dev-token in a .dev.vars file.
+}

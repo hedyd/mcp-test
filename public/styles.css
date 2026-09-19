@@ -1,0 +1,146 @@
+:root {
+  --bg: #0b0d12;
+  --fg: #e8ecf5;
+  --muted: #8b93a7;
+  --line: #1e2332;
+  --accent: #6ea8ff;
+  color-scheme: dark;
+}
+
+html[data-theme="light"] {
+  --bg: #fbfbfd;
+  --fg: #14161c;
+  --muted: #6b7280;
+  --line: #e4e6ee;
+  --accent: #2563eb;
+  color-scheme: light;
+}
+
+html[data-theme="neon"] {
+  --bg: #08010f;
+  --fg: #f4e9ff;
+  --muted: #a97fd6;
+  --line: #2b0b47;
+  --accent: #ff4ecd;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--fg);
+  font: 400 16px/1.5 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  transition: background 400ms ease, color 400ms ease;
+}
+
+.stage {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: clamp(24px, 6vw, 72px) 20px 48px;
+  padding-top: calc(clamp(24px, 6vw, 72px) + env(safe-area-inset-top, 0px));
+  padding-bottom: calc(48px + env(safe-area-inset-bottom, 0px));
+}
+
+.bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  font-size: 13px;
+  color: var(--muted);
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 12px;
+}
+
+.room b { color: var(--fg); font-weight: 600; }
+
+.status { display: inline-flex; align-items: center; gap: 7px; }
+
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--muted);
+  box-shadow: 0 0 0 0 currentColor;
+}
+
+.status[data-state="open"] .dot { background: #34d399; animation: pulse 2s infinite; }
+.status[data-state="connecting"] .dot { background: #fbbf24; }
+.status[data-state="closed"] .dot { background: #f87171; }
+
+@keyframes pulse {
+  0% { box-shadow: 0 0 0 0 rgba(52, 211, 153, 0.5); }
+  70% { box-shadow: 0 0 0 7px rgba(52, 211, 153, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(52, 211, 153, 0); }
+}
+
+h1 {
+  margin: 40px 0 0;
+  font-size: clamp(32px, 7vw, 56px);
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  font-weight: 650;
+}
+
+/* Flashes whenever a tool call lands, so you can see the push arrive. */
+h1.flash, .feed li.flash { animation: flash 900ms ease-out; }
+
+@keyframes flash {
+  from { background: color-mix(in srgb, var(--accent) 35%, transparent); }
+  to { background: transparent; }
+}
+
+.subhead {
+  margin: 16px 0 0;
+  font-size: clamp(16px, 2.4vw, 20px);
+  color: var(--muted);
+  max-width: 52ch;
+}
+
+.feed { margin-top: 48px; }
+
+.feed h2 {
+  margin: 0 0 12px;
+  font-size: 12px;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.feed ul { list-style: none; margin: 0; padding: 0; }
+
+.feed li {
+  padding: 11px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  margin-bottom: 8px;
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 16px;
+}
+
+.feed li time {
+  color: var(--muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.meta {
+  margin-top: 48px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+  display: flex;
+  gap: 18px;
+  flex-wrap: wrap;
+  font-size: 12px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}

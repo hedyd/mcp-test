@@ -1,0 +1,23 @@
+{
+  "name": "mcp-live-site",
+  "version": "1.0.0",
+  "private": true,
+  "description": "A static frontend that updates live when an AI calls an MCP tool. Cloudflare Worker + Durable Object + WebSockets. No database, no origin server.",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "tail": "wrangler tail",
+    "types": "wrangler types",
+    "call": "node scripts/mcp-call.mjs"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20260918.1",
+    "typescript": "^5.7.3",
+    "wrangler": "^4.0.0"
+  },
+  "allowScripts": {
+    "esbuild@0.28.1": true,
+    "workerd@1.20260918.1": true
+  }
+}

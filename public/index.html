@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Live site · driven by MCP</title>
+    <link rel="icon" href="data:," />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="stage">
+      <header class="bar">
+        <span class="room">room: <b id="room">demo</b></span>
+        <span class="status" id="status" data-state="connecting">
+          <i class="dot"></i><span id="status-text">connecting…</span>
+        </span>
+      </header>
+
+      <h1 id="headline">Loading…</h1>
+      <p id="subhead" class="subhead"></p>
+
+      <section class="feed" id="feed-wrap" hidden>
+        <h2>Live feed</h2>
+        <ul id="feed"></ul>
+      </section>
+
+      <footer class="meta">
+        <span id="viewers">— watching</span>
+        <span id="rev">rev 0</span>
+        <span id="updated"></span>
+      </footer>
+    </main>
+
+    <script src="/app.js"></script>
+  </body>
+</html>
