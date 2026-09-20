@@ -17,9 +17,11 @@ export interface SiteState {
   headline: string;
   subhead: string;
   theme: "light" | "dark" | "neon";
-  items: { id: string; text: string; at: string }[];
+  items: { id: string; text: string; at: string; by?: string }[];
   rev: number;
   updatedAt: string;
+  /** Who made the last change — a GitHub username, or "admin" for MCP_TOKEN. */
+  updatedBy?: string;
 }
 
 const INITIAL_STATE: SiteState = {
@@ -34,7 +36,17 @@ const INITIAL_STATE: SiteState = {
 export type Patch = Partial<Pick<SiteState, "headline" | "subhead" | "theme">> & {
   addItem?: string;
   clearItems?: boolean;
+  author?: string;
 };
+
+/**
+ * Normalise a room name. The browser (?room=) and MCP (room argument) paths both
+ * go through this, so "Alice" and "alice" can never become two different objects.
+ */
+export function sanitizeRoom(raw: string | null | undefined): string {
+  const room = (raw ?? "demo").toLowerCase().replace(/[^a-z0-9-_]/g, "").slice(0, 64);
+  return room || "demo";
+}
 
 export class SiteRoom implements DurableObject {
   private state: SiteState | null = null;
@@ -142,12 +154,14 @@ export class SiteRoom implements DurableObject {
           id: crypto.randomUUID(),
           text: patch.addItem,
           at: new Date().toISOString(),
+          by: patch.author,
         },
       ].slice(-50);
     }
 
     state.rev += 1;
     state.updatedAt = new Date().toISOString();
+    state.updatedBy = patch.author;
 
     this.state = state;
     await this.ctx.storage.put("state", state);

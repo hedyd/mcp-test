@@ -75,7 +75,8 @@ function render(state) {
       text.textContent = item.text;
       const time = document.createElement("time");
       time.dateTime = item.at;
-      time.textContent = new Date(item.at).toLocaleTimeString();
+      time.textContent =
+        (item.by ? `${item.by} · ` : "") + new Date(item.at).toLocaleTimeString();
       li.append(text, time);
       if (changed && !known.has(item.id)) flash(li);
       return li;
@@ -84,7 +85,8 @@ function render(state) {
 
   el("rev").textContent = `rev ${state.rev}`;
   el("updated").textContent = state.rev
-    ? `updated ${new Date(state.updatedAt).toLocaleTimeString()}`
+    ? `updated ${new Date(state.updatedAt).toLocaleTimeString()}` +
+      (state.updatedBy ? ` by ${state.updatedBy}` : "")
     : "never updated";
 }
 

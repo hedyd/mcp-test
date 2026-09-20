@@ -9,7 +9,8 @@
  * what actually pushes the change to the open browsers.
  */
 
-import type { Patch, SiteState } from "./room";
+import { identityFor, type AuthProps, type Identity } from "./auth";
+import { sanitizeRoom, type Patch, type SiteState } from "./room";
 
 const PROTOCOL_VERSION = "2025-06-18";
 
@@ -22,6 +23,9 @@ interface JsonRpcRequest {
   params?: Record<string, unknown>;
 }
 
+const ROOM_HINT =
+  "Room to use. Defaults to your own room (your GitHub username) if you signed in, otherwise 'demo'.";
+
 const TOOLS = [
   {
     name: "set_headline",
@@ -32,7 +36,7 @@ const TOOLS = [
       properties: {
         headline: { type: "string", description: "The new headline text." },
         subhead: { type: "string", description: "Optional smaller line underneath." },
-        room: { type: "string", description: "Room to update. Defaults to 'demo'." },
+        room: { type: "string", description: ROOM_HINT },
       },
       required: ["headline"],
     },
@@ -44,7 +48,7 @@ const TOOLS = [
       type: "object",
       properties: {
         theme: { type: "string", enum: ["light", "dark", "neon"] },
-        room: { type: "string", description: "Room to update. Defaults to 'demo'." },
+        room: { type: "string", description: ROOM_HINT },
       },
       required: ["theme"],
     },
@@ -57,7 +61,7 @@ const TOOLS = [
       type: "object",
       properties: {
         text: { type: "string", description: "The line to append." },
-        room: { type: "string", description: "Room to update. Defaults to 'demo'." },
+        room: { type: "string", description: ROOM_HINT },
       },
       required: ["text"],
     },
@@ -68,7 +72,7 @@ const TOOLS = [
     inputSchema: {
       type: "object",
       properties: {
-        room: { type: "string", description: "Room to update. Defaults to 'demo'." },
+        room: { type: "string", description: ROOM_HINT },
       },
     },
   },
@@ -79,13 +83,17 @@ const TOOLS = [
     inputSchema: {
       type: "object",
       properties: {
-        room: { type: "string", description: "Room to read. Defaults to 'demo'." },
+        room: { type: "string", description: ROOM_HINT },
       },
     },
   },
 ] as const;
 
-export async function handleMcp(request: Request, env: Env): Promise<Response> {
+/**
+ * Only reached with a valid token: the OAuth provider in index.ts has already
+ * rejected everything else with a 401 that tells the client how to sign in.
+ */
+export async function handleMcp(request: Request, env: Env, props: AuthProps): Promise<Response> {
   if (request.method === "DELETE") return new Response(null, { status: 204 });
 
   // GET is the optional server->client SSE stream. This server has nothing
@@ -94,13 +102,13 @@ export async function handleMcp(request: Request, env: Env): Promise<Response> {
     return new Response("method not allowed", { status: 405 });
   }
 
-  if (!authorized(request, env)) {
-    return new Response(JSON.stringify({ error: "unauthorized" }), {
-      status: 401,
-      headers: {
-        "content-type": "application/json",
-        "www-authenticate": "Bearer",
-      },
+  // The token is valid, but access can be withdrawn after it was issued
+  // (someone removed from ALLOWED_USERS), so check again on every call.
+  const who = identityFor(props, env);
+  if (!who) {
+    return new Response(JSON.stringify({ error: "forbidden" }), {
+      status: 403,
+      headers: { "content-type": "application/json" },
     });
   }
 
@@ -117,7 +125,7 @@ export async function handleMcp(request: Request, env: Env): Promise<Response> {
   }
 
   try {
-    return rpcResult(body.id, await dispatch(body, env));
+    return rpcResult(body.id, await dispatch(body, env, who, new URL(request.url).origin));
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     if (message.startsWith("METHOD_NOT_FOUND:")) {
@@ -127,15 +135,23 @@ export async function handleMcp(request: Request, env: Env): Promise<Response> {
   }
 }
 
-async function dispatch(req: JsonRpcRequest, env: Env): Promise<unknown> {
+async function dispatch(
+  req: JsonRpcRequest,
+  env: Env,
+  who: Identity,
+  origin: string,
+): Promise<unknown> {
   switch (req.method) {
     case "initialize":
       return {
         protocolVersion: PROTOCOL_VERSION,
         capabilities: { tools: { listChanged: false } },
         serverInfo: { name: "mcp-live-site", version: "1.0.0" },
-        instructions:
-          "Tools here drive a live web page. Changes appear in open browsers immediately.",
+        instructions: who.room
+          ? `You are signed in as "${who.name}". Your page is ${origin}/?room=${who.room}. ` +
+            "Every tool writes there; other rooms are off limits. Changes appear in open browsers immediately."
+          : `Tools here drive live web pages at ${origin}/?room=<room>. ` +
+            'Changes appear in open browsers immediately. Room defaults to "demo".',
       };
 
     case "ping":
@@ -145,7 +161,11 @@ async function dispatch(req: JsonRpcRequest, env: Env): Promise<unknown> {
       return { tools: TOOLS };
 
     case "tools/call":
-      return callTool(req.params as { name?: string; arguments?: Record<string, unknown> }, env);
+      return callTool(
+        req.params as { name?: string; arguments?: Record<string, unknown> },
+        env,
+        who,
+      );
 
     default:
       throw new Error(`METHOD_NOT_FOUND:Unknown method: ${req.method}`);
@@ -155,10 +175,19 @@ async function dispatch(req: JsonRpcRequest, env: Env): Promise<unknown> {
 async function callTool(
   params: { name?: string; arguments?: Record<string, unknown> } | undefined,
   env: Env,
+  who: Identity,
 ): Promise<unknown> {
   const name = params?.name;
   const args = params?.arguments ?? {};
-  const room = typeof args.room === "string" && args.room ? args.room : "demo";
+  const asked = typeof args.room === "string" && args.room ? sanitizeRoom(args.room) : null;
+  const room = asked ?? who.room ?? "demo";
+
+  if (who.room && room !== who.room) {
+    return toolText(
+      `You are signed in as "${who.name}" and can only use room "${who.room}", not "${room}".`,
+      true,
+    );
+  }
 
   let patch: Patch | null = null;
 
@@ -196,9 +225,9 @@ async function callTool(
       throw new Error(`METHOD_NOT_FOUND:Unknown tool: ${name}`);
   }
 
-  const state = await roomRequest<SiteState>(env, room, "/apply", patch);
+  const state = await roomRequest<SiteState>(env, room, "/apply", { ...patch, author: who.name });
   return toolText(
-    `Pushed to room "${room}" (rev ${state.rev}). The page now reads "${state.headline}".`,
+    `Pushed to room "${room}" as ${who.name} (rev ${state.rev}). The page now reads "${state.headline}".`,
   );
 }
 
@@ -218,12 +247,6 @@ async function roomRequest<T>(
   });
   if (!res.ok) throw new Error(`Room error ${res.status}: ${await res.text()}`);
   return (await res.json()) as T;
-}
-
-function authorized(request: Request, env: Env): boolean {
-  // No token configured = open server. Fine for a demo, set one before sharing.
-  if (!env.MCP_TOKEN) return true;
-  return request.headers.get("authorization") === `Bearer ${env.MCP_TOKEN}`;
 }
 
 function toolText(text: string, isError = false) {

@@ -1,38 +1,54 @@
 {
-  "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "mcp-live-site",
-  "main": "src/index.ts",
-  "compatibility_date": "2025-09-01",
-
-  // The static frontend. Cloudflare serves these files straight from the edge;
-  // only requests that do NOT match a file (/mcp, /ws, /api/*) reach the Worker.
-  "assets": {
-    "directory": "./public",
-    "binding": "ASSETS"
-  },
-
-  "durable_objects": {
-    "bindings": [
-      {
-        "name": "SITE_ROOM",
-        "class_name": "SiteRoom"
-      }
-    ]
-  },
-
-  // SQLite-backed Durable Objects are required on the Workers free plan.
-  "migrations": [
-    {
-      "tag": "v1",
-      "new_sqlite_classes": ["SiteRoom"]
-    }
-  ],
-
-  "observability": {
-    "enabled": true
-  }
-
-  // Auth token for the /mcp endpoint is a secret, not a var:
-  //   npx wrangler secret put MCP_TOKEN
-  // For local dev, put MCP_TOKEN=dev-token in a .dev.vars file.
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "mcp-live-site",
+	"main": "src/index.ts",
+	"compatibility_date": "2025-09-01",
+	// The static frontend. Cloudflare serves these files straight from the edge;
+	// only requests that do NOT match a file (/mcp, /ws, /api/*) reach the Worker.
+	"assets": {
+		"directory": "./public",
+		"binding": "ASSETS"
+	},
+	"durable_objects": {
+		"bindings": [
+			{
+				"name": "SITE_ROOM",
+				"class_name": "SiteRoom"
+			}
+		]
+	},
+	// SQLite-backed Durable Objects are required on the Workers free plan.
+	"migrations": [
+		{
+			"tag": "v1",
+			"new_sqlite_classes": [
+				"SiteRoom"
+			]
+		}
+	],
+	// Sign-in state: OAuth grants, tokens and registered clients. No "id" here on
+	// purpose — `wrangler deploy` creates the namespace on first deploy and writes
+	// its id back into this file. Commit that change.
+	"kv_namespaces": [
+		{
+			"binding": "OAUTH_KV",
+			"id": "5e9c6351110f44eaa3c163515d4e66aa"
+		}
+	],
+	// Who may do what. GitHub usernames, comma-separated, case-insensitive.
+	// Edits apply to already-signed-in users on the next deploy — no re-login.
+	"vars": {
+		// Can write to any room.
+		"ADMIN_USERS": "hedyd",
+		// Only these accounts may sign in. Empty = any GitHub account, each confined
+		// to the room matching their username.
+		"ALLOWED_USERS": ""
+	},
+	"observability": {
+		"enabled": true
+	}
+	// Secrets, set with `npx wrangler secret put <NAME>`, never written here:
+	//   GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRET   from your GitHub OAuth app
+	//   MCP_TOKEN                                optional admin key for scripts/CI
+	// For local dev, put them in a .dev.vars file instead.
 }
